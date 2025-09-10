@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Гра 15</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #game {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    width: 80vmin;
+    height: 80vmin;
+    gap: 2px;
+  }
+
+  .tile {
+    background: red;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: calc(5vmin);
+    font-weight: bold;
+    user-select: none;
+    cursor: pointer;
+  }
+
+  .empty {
+    background: black;
+    cursor: default;
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<script>
+const game = document.getElementById('game');
+let tiles = [];
+
+function initTiles() {
+  tiles = Array.from({length: 15}, (_, i) => i + 1).concat(0);
+  shuffleTiles();
+  drawTiles();
+}
+
+function shuffleTiles() {
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+  if (!isSolvable(tiles)) shuffleTiles();
+}
+
+function isSolvable(arr) {
+  let inv = 0;
+  for (let i=0;i<16;i++)
+    for (let j=i+1;j<16;j++)
+      if(arr[i] && arr[j] && arr[i]>arr[j]) inv++;
+  const row = Math.floor(arr.indexOf(0)/4);
+  return (4 %2===0) ? ((3-row)%2===0 ? inv%2!==0 : inv%2===0) : inv%2===0;
+}
+
+function drawTiles() {
+  game.innerHTML = '';
+  tiles.forEach((n,i)=>{
+    const tile = document.createElement('div');
+    tile.className = n===0?'tile empty':'tile';
+    if(n) tile.textContent = n;
+    tile.addEventListener('click',()=>moveTile(i));
+    game.appendChild(tile);
+  });
+}
+
+function moveTile(i){
+  const empty = tiles.indexOf(0);
+  const moves=[empty-1,empty+1,empty-4,empty+4];
+  if(i===empty-1 && empty%4===0) return;
+  if(i===empty+1 && empty%4===3) return;
+  if(moves.includes(i)){
+    [tiles[i],tiles[empty]]=[tiles[empty],tiles[i]];
+    drawTiles();
+    checkWin();
+  }
+}
+
+function checkWin(){
+  if(tiles.slice(0,15).every((v,i)=>v===i+1))
+    setTimeout(()=>alert('Ви виграли! 🎉'),100);
+}
+
+initTiles();
+</script>
+</body>
+</html>
