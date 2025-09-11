@@ -52,21 +52,28 @@ function initTiles() {
   drawTiles();
 }
 
+// Перемішування з перевіркою на розв'язуваність
 function shuffleTiles() {
-  for (let i = tiles.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
-  }
-  if (!isSolvable(tiles)) shuffleTiles();
+  do {
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+    }
+  } while (!isSolvable(tiles));
 }
 
+// Функція перевірки розв'язуваності для 4x4
 function isSolvable(arr) {
   let inv = 0;
-  for (let i=0;i<16;i++)
-    for (let j=i+1;j<16;j++)
-      if(arr[i] && arr[j] && arr[i]>arr[j]) inv++;
-  const row = Math.floor(arr.indexOf(0)/4);
-  return (4 %2===0) ? ((3-row)%2===0 ? inv%2!==0 : inv%2===0) : inv%2===0;
+  for (let i = 0; i < 16; i++) {
+    for (let j = i + 1; j < 16; j++) {
+      if (arr[i] && arr[j] && arr[i] > arr[j]) inv++;
+    }
+  }
+  const emptyRow = Math.floor(arr.indexOf(0) / 4); // рядок порожньої клітини (0-3 зверху)
+  const emptyRowFromBottom = 3 - emptyRow; // рахунок від низу
+  // Для 4x4: парне поле → розв'язок, якщо (інверсії + рядок знизу) парне
+  return (inv + emptyRowFromBottom) % 2 === 0;
 }
 
 function drawTiles() {
