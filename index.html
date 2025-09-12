@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <title>Гра 15</title>
+<link rel="icon" href="data:image/svg+xml,
+  <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
+    <rect width='64' height='64' fill='red'/>
+    <text x='32' y='42' font-size='32' text-anchor='middle' fill='white' font-family='Arial'>15</text>
+  </svg>">
 <style>
   html, body {
     margin: 0;
@@ -46,13 +51,14 @@
 const game = document.getElementById('game');
 let tiles = [];
 
+// Ініціалізація
 function initTiles() {
   tiles = Array.from({length: 15}, (_, i) => i + 1).concat(0);
   shuffleTiles();
   drawTiles();
 }
 
-// Перемішування з перевіркою на розв'язуваність
+// Перемішування з гарантією розв'язності
 function shuffleTiles() {
   do {
     for (let i = tiles.length - 1; i > 0; i--) {
@@ -71,38 +77,48 @@ function isSolvable(arr) {
     }
   }
   const emptyRow = Math.floor(arr.indexOf(0) / 4); // рядок порожньої клітини (0-3 зверху)
-  const emptyRowFromBottom = 3 - emptyRow; // рахунок від низу
-  // Для 4x4: парне поле → розв'язок, якщо (інверсії + рядок знизу) парне
-  return (inv + emptyRowFromBottom) % 2 === 0;
+  const emptyRowFromBottom = 4 - emptyRow; // 1–4
+  // Для 4x4: розв'язно, якщо (інверсії + рядок_знизу) непарні
+  return (inv + emptyRowFromBottom) % 2 === 1;
 }
 
+// Малювання плиток
 function drawTiles() {
   game.innerHTML = '';
-  tiles.forEach((n,i)=>{
+  tiles.forEach((n, i) => {
     const tile = document.createElement('div');
-    tile.className = n===0?'tile empty':'tile';
-    if(n) tile.textContent = n;
-    tile.addEventListener('click',()=>moveTile(i));
+    tile.className = n === 0 ? 'tile empty' : 'tile';
+    if (n) tile.textContent = n;
+    tile.dataset.index = i;
     game.appendChild(tile);
   });
 }
 
-function moveTile(i){
+// Рух плитки
+function moveTile(i) {
   const empty = tiles.indexOf(0);
-  const moves=[empty-1,empty+1,empty-4,empty+4];
-  if(i===empty-1 && empty%4===0) return;
-  if(i===empty+1 && empty%4===3) return;
-  if(moves.includes(i)){
-    [tiles[i],tiles[empty]]=[tiles[empty],tiles[i]];
+  const moves = [empty - 1, empty + 1, empty - 4, empty + 4];
+  if (i === empty - 1 && empty % 4 === 0) return;
+  if (i === empty + 1 && empty % 4 === 3) return;
+  if (moves.includes(i)) {
+    [tiles[i], tiles[empty]] = [tiles[empty], tiles[i]];
     drawTiles();
     checkWin();
   }
 }
 
-function checkWin(){
-  if(tiles.slice(0,15).every((v,i)=>v===i+1))
-    setTimeout(()=>alert('Туся, дякую! 🎉'),100);
+// Перевірка виграшу
+function checkWin() {
+  if (tiles.slice(0, 15).every((v, i) => v === i + 1)) {
+    setTimeout(() => alert('Туся, дякую! 🎉'), 100);
+  }
 }
+
+// Делегування подій (один слухач)
+game.addEventListener('click', e => {
+  if (!e.target.classList.contains('tile') || e.target.classList.contains('empty')) return;
+  moveTile(+e.target.dataset.index);
+});
 
 initTiles();
 </script>
