@@ -2,20 +2,26 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Гра 15">
+<meta name="theme-color" content="#000000">
 <title>Гра 15</title>
-<link rel="icon" href="data:image/svg+xml,
-  <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
-    <rect width='64' height='64' fill='red'/>
-    <text x='32' y='42' font-size='32' text-anchor='middle' fill='white' font-family='Arial'>15</text>
-  </svg>">
 <style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   html, body {
-    margin: 0;
     height: 100%;
-    background: black;
+    background: #000;
     display: flex;
     justify-content: center;
     align-items: center;
+    padding:
+      env(safe-area-inset-top, 0px)
+      env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px)
+      env(safe-area-inset-left, 0px);
   }
 
   #game {
@@ -29,36 +35,108 @@
 
   .tile {
     background: red;
-    color: white;
+    color: #fff;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: calc(5vmin);
+    font-size: 5vmin;
     font-weight: bold;
     user-select: none;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .empty {
-    background: black;
-    cursor: default;
+  .empty { background: #000; cursor: default; }
+
+  #win {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000;
+    color: red;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2vmin;
+    font-size: 7vmin;
+    font-weight: bold;
+    cursor: pointer;
   }
+
+  #win.show { display: flex; }
+
+  #win span { font-size: 4vmin; color: #fff; opacity: 0.6; }
 </style>
 </head>
 <body>
 <div id="game"></div>
+<div id="win">
+  Туся, дякую! 🎉
+  <span>торкнись, щоб грати знову</span>
+</div>
 <script>
-const game = document.getElementById('game');
-let tiles = [];
+// ─── PWA: іконки + маніфест ───────────────────────────────────────────────────
+function setupPWA() {
+  // Одна функція — один Canvas на розмір
+  function icon(size) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${size * 0.5}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('15', size / 2, size / 2);
+    return c.toDataURL('image/png');
+  }
 
-// Ініціалізація
-function initTiles() {
-  tiles = Array.from({length: 15}, (_, i) => i + 1).concat(0);
-  shuffleTiles();
-  drawTiles();
+  const i64  = icon(64);
+  const i192 = icon(192);
+
+  // Favicon
+  const fav = document.createElement('link');
+  fav.rel = 'icon'; fav.type = 'image/png'; fav.href = i64;
+  document.head.appendChild(fav);
+
+  // Apple Touch Icon
+  const ati = document.createElement('link');
+  ati.rel = 'apple-touch-icon'; ati.href = i192;
+  document.head.appendChild(ati);
+
+  // Маніфест через data: URI — без Blob, без URL.createObjectURL
+  const manifest = {
+    name: 'Гра 15', short_name: '15',
+    display: 'fullscreen',
+    background_color: '#000000', theme_color: '#000000',
+    start_url: '.',
+    icons: [
+      { src: i192, sizes: '192x192', type: 'image/png' }
+    ]
+  };
+  const mf = document.createElement('link');
+  mf.rel = 'manifest';
+  mf.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest));
+  document.head.appendChild(mf);
 }
 
-// Перемішування з гарантією розв'язності
+setupPWA();
+
+// ─── Гра ──────────────────────────────────────────────────────────────────────
+const game = document.getElementById('game');
+const winEl = document.getElementById('win');
+
+let tiles   = [];   // масив 16 чисел (0 = порожньо)
+let tileEls = [];   // масив DOM-елементів
+let emptyIdx = 15;  // позиція порожньої клітини — без indexOf при кожному ході
+
+function initTiles() {
+  tiles = Array.from({ length: 15 }, (_, i) => i + 1).concat(0);
+  shuffleTiles();
+  buildDOM();
+}
+
 function shuffleTiles() {
   do {
     for (let i = tiles.length - 1; i > 0; i--) {
@@ -66,58 +144,56 @@ function shuffleTiles() {
       [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
     }
   } while (!isSolvable(tiles));
+  emptyIdx = tiles.indexOf(0);
 }
 
-// Функція перевірки розв'язуваності для 4x4
 function isSolvable(arr) {
   let inv = 0;
-  for (let i = 0; i < 16; i++) {
-    for (let j = i + 1; j < 16; j++) {
+  for (let i = 0; i < 16; i++)
+    for (let j = i + 1; j < 16; j++)
       if (arr[i] && arr[j] && arr[i] > arr[j]) inv++;
-    }
-  }
-  const emptyRow = Math.floor(arr.indexOf(0) / 4); // рядок порожньої клітини (0-3 зверху)
-  const emptyRowFromBottom = 4 - emptyRow; // 1–4
-  // Для 4x4: розв'язно, якщо (інверсії + рядок_знизу) непарні
-  return (inv + emptyRowFromBottom) % 2 === 1;
+  return (inv + 4 - Math.floor(arr.indexOf(0) / 4)) % 2 === 1;
 }
 
-// Малювання плиток
-function drawTiles() {
+function buildDOM() {
   game.innerHTML = '';
-  tiles.forEach((n, i) => {
-    const tile = document.createElement('div');
-    tile.className = n === 0 ? 'tile empty' : 'tile';
-    if (n) tile.textContent = n;
-    tile.dataset.index = i;
-    game.appendChild(tile);
+  tileEls = tiles.map((n, i) => {
+    const el = document.createElement('div');
+    el.className = n === 0 ? 'tile empty' : 'tile';
+    if (n) el.textContent = n;
+    el.dataset.index = i;
+    game.appendChild(el);
+    return el;
   });
 }
 
-// Рух плитки
+function swapDOM(a, b) {
+  [tiles[a], tiles[b]] = [tiles[b], tiles[a]];
+  for (const idx of [a, b]) {
+    const el = tileEls[idx], val = tiles[idx];
+    el.textContent   = val || '';
+    el.className     = val === 0 ? 'tile empty' : 'tile';
+  }
+  emptyIdx = a; // порожня клітина переходить на місце тайлу що рухався
+}
+
 function moveTile(i) {
-  const empty = tiles.indexOf(0);
-  const moves = [empty - 1, empty + 1, empty - 4, empty + 4];
-  if (i === empty - 1 && empty % 4 === 0) return;
-  if (i === empty + 1 && empty % 4 === 3) return;
-  if (moves.includes(i)) {
-    [tiles[i], tiles[empty]] = [tiles[empty], tiles[i]];
-    drawTiles();
-    checkWin();
-  }
+  const diff = i - emptyIdx;
+  if (diff === -4 || diff === 4)                              { swapDOM(i, emptyIdx); checkWin(); return; }
+  if (diff === -1 && emptyIdx % 4 !== 0)                     { swapDOM(i, emptyIdx); checkWin(); return; }
+  if (diff ===  1 && emptyIdx % 4 !== 3)                     { swapDOM(i, emptyIdx); checkWin(); return; }
 }
 
-// Перевірка виграшу
 function checkWin() {
-  if (tiles.slice(0, 15).every((v, i) => v === i + 1)) {
-    setTimeout(() => alert('Туся, дякую! 🎉'), 100);
-  }
+  if (tiles.slice(0, 15).every((v, i) => v === i + 1)) winEl.classList.add('show');
 }
 
-// Делегування подій (один слухач)
+winEl.addEventListener('click', () => { winEl.classList.remove('show'); initTiles(); });
+
 game.addEventListener('click', e => {
-  if (!e.target.classList.contains('tile') || e.target.classList.contains('empty')) return;
-  moveTile(+e.target.dataset.index);
+  const el = e.target;
+  if (!el.classList.contains('tile') || el.classList.contains('empty')) return;
+  moveTile(+el.dataset.index);
 });
 
 initTiles();
